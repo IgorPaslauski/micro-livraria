@@ -1,7 +1,11 @@
-function newBook(book) {
-    const div = document.createElement('div');
-    div.className = 'column is-4';
-    div.innerHTML = `
+const END_POINT = 'http://localhost:3000';
+const books = document.querySelector('.books');
+const inputSearch = document.querySelector('#inputSearch');
+const btnSearch = document.querySelector('#btnSearch');
+
+const template = {
+    Book: book => {
+        return `
         <div class="card is-shady">
             <div class="card-image">
                 <figure class="image is-4by3">
@@ -31,60 +35,79 @@ function newBook(book) {
                     <button class="button button-buy is-success is-fullwidth">Comprar</button>
                 </div>
             </div>
-        </div>`;
+        </div>
+        `;
+    },
+};
+
+function newBook(book) {
+    const div = document.createElement('div');
+    div.className = 'column is-4';
+    div.innerHTML = template.Book(book);
     return div;
 }
 
-function calculateShipping(id, cep) {
-    fetch('http://localhost:3000/shipping/' + cep)
-        .then((data) => {
+function ExecutaServico(metodo, sucess, error, messageEror = 'Erro ao executar o serviço') {
+    fetch(`${END_POINT}/${metodo}`)
+        .then(data => {
             if (data.ok) {
                 return data.json();
             }
             throw data.statusText;
         })
-        .then((data) => {
-            swal('Frete', `O frete é: R$${data.value.toFixed(2)}`, 'success');
-        })
-        .catch((err) => {
-            swal('Erro', 'Erro ao consultar frete', 'error');
+        .then(data => { sucess(data); })
+        .catch(err => {
+            swal('Erro', messageEror, 'error');
             console.error(err);
+            error(err);
         });
 }
 
+function calculateShipping() {
+    const id = event.target.getAttribute('data-id');
+    const cep = document.querySelector(`.book[data-id="${id}"] input`).value;
+
+    if (!cep) {
+        swal('Frete', 'Por favor, informe o CEP', 'warning');
+        return;
+    }
+
+    ExecutaServico(`shipping/${cep}`, data => swal('Frete', `O frete é: R$${data.value.toFixed(2)}`, 'success'), err => { }, 'Erro ao calcular o frete');
+}
+
+function getBook(id) {
+    if (!id) {
+        getALLBooks();
+        return;
+    }
+
+    books.innerHTML = '';
+
+    ExecutaServico(`product/${id}`, (data) => {
+        if (!data)
+            return;
+
+        books.appendChild(newBook(data));
+    }, err => { }, 'Erro ao buscar o produto');
+}
+
+function getALLBooks() {
+    books.innerHTML = '';
+
+    ExecutaServico('products', (data) => {
+        if (!data)
+            return;
+
+        data.forEach(book => books.appendChild(newBook(book)));
+
+        document.querySelectorAll('.button-shipping').forEach(btn => btn.addEventListener('click', calculateShipping));
+        document.querySelectorAll('.button-buy').forEach(btn =>
+            btn.addEventListener('click', e =>
+                swal('Compra de livro', 'Sua compra foi realizada com sucesso', 'success')));
+    }, (err) => { }, 'Erro ao listar os produtos');
+}
+
 document.addEventListener('DOMContentLoaded', function () {
-    const books = document.querySelector('.books');
-
-    fetch('http://localhost:3000/products')
-        .then((data) => {
-            if (data.ok) {
-                return data.json();
-            }
-            throw data.statusText;
-        })
-        .then((data) => {
-            if (data) {
-                data.forEach((book) => {
-                    books.appendChild(newBook(book));
-                });
-
-                document.querySelectorAll('.button-shipping').forEach((btn) => {
-                    btn.addEventListener('click', (e) => {
-                        const id = e.target.getAttribute('data-id');
-                        const cep = document.querySelector(`.book[data-id="${id}"] input`).value;
-                        calculateShipping(id, cep);
-                    });
-                });
-
-                document.querySelectorAll('.button-buy').forEach((btn) => {
-                    btn.addEventListener('click', (e) => {
-                        swal('Compra de livro', 'Sua compra foi realizada com sucesso', 'success');
-                    });
-                });
-            }
-        })
-        .catch((err) => {
-            swal('Erro', 'Erro ao listar os produtos', 'error');
-            console.error(err);
-        });
+    btnSearch.addEventListener('click', () => getBook(inputSearch.value));
+    getALLBooks();
 });

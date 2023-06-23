@@ -43,6 +43,20 @@ app.get('/shipping/:cep', (req, res, next) => {
 });
 
 /**
+ * Consulta um produto pelo ID via InventoryService
+ */
+app.get('/product/:id', (req, res, next) => {
+    inventory.SearchProductByID({ id: parseInt(req.params.id) }, (err, product) => {
+        if (err) {
+            console.log(err);
+            res.status(500).send({ error: 'something failed :(' });
+        } else {
+            res.json(product);
+        }
+    });
+});
+
+/**
  * Inicia o router
  */
 app.listen(3000, () => {
